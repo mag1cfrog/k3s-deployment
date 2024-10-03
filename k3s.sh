@@ -1,20 +1,27 @@
 #!/bin/bash
 
-echo -e " \033[33;5m    __  _          _        ___                            \033[0m"
-echo -e " \033[33;5m    \ \(_)_ __ ___( )__    / _ \__ _ _ __ __ _  __ _  ___  \033[0m"
-echo -e " \033[33;5m     \ \ | '_ \` _ \/ __|  / /_\/ _\` | '__/ _\` |/ _\` |/ _ \ \033[0m"
-echo -e " \033[33;5m  /\_/ / | | | | | \__ \ / /_\\  (_| | | | (_| | (_| |  __/ \033[0m"
-echo -e " \033[33;5m  \___/|_|_| |_| |_|___/ \____/\__,_|_|  \__,_|\__, |\___| \033[0m"
-echo -e " \033[33;5m                                               |___/       \033[0m"
+# Exit immediately if a command exits with a non-zero status
+set -e
 
-echo -e " \033[36;5m         _  _________   ___         _        _ _           \033[0m"
-echo -e " \033[36;5m        | |/ |__ / __| |_ _|_ _  __| |_ __ _| | |          \033[0m"
-echo -e " \033[36;5m        | ' < |_ \__ \  | || ' \(_-|  _/ _\` | | |          \033[0m"
-echo -e " \033[36;5m        |_|\_|___|___/ |___|_||_/__/\__\__,_|_|_|          \033[0m"
-echo -e " \033[36;5m                                                           \033[0m"
-echo -e " \033[32;5m             https://youtube.com/@jims-garage              \033[0m"
-echo -e " \033[32;5m                                                           \033[0m"
+# Function to display ASCII Art Banner
+display_banner() {
+    echo -e " \033[33;5m    __  _          _        ___                            \033[0m"
+    echo -e " \033[33;5m    \ \(_)_ __ ___( )__    / _ \__ _ _ __ __ _  __ _  ___  \033[0m"
+    echo -e " \033[33;5m     \ \ | '_ \` _ \/ __|  / /_\/ _\` | '__/ _\` |/ _\` |/ _ \ \033[0m"
+    echo -e " \033[33;5m  /\_/ / | | | | | \__ \ / /_\\  (_| | | | (_| | (_| |  __/ \033[0m"
+    echo -e " \033[33;5m  \___/|_|_| |_| |_|___/ \____/\__,_|_|  \__,_|\__, |\___| \033[0m"
+    echo -e " \033[33;5m                                               |___/       \033[0m"
 
+    echo -e " \033[36;5m         _  _________   ___         _        _ _           \033[0m"
+    echo -e " \033[36;5m        | |/ |__ / __| |_ _|_ _  __| |_ __ _| | |          \033[0m"
+    echo -e " \033[36;5m        | ' < |_ \__ \  | || ' \(_-|  _/ _\` | | |          \033[0m"
+    echo -e " \033[36;5m        |_|\_|___|___/ |___|_||_/__/\__\__,_|_|_|          \033[0m"
+    echo -e " \033[36;5m                                                           \033[0m"
+    echo -e " \033[32;5m             https://youtube.com/@jims-garage              \033[0m"
+    echo -e " \033[32;5m                                                           \033[0m"
+}
+
+display_banner
 
 #############################################
 # YOU SHOULD ONLY NEED TO EDIT THIS SECTION #
@@ -26,49 +33,48 @@ KVVERSION="v0.6.3"
 # K3S Version
 k3sVersion="v1.26.10+k3s2"
 
-# Set the IP addresses of the master and work nodes
-# master1=192.168.3.21
-# master2=192.168.3.22
-# master3=192.168.3.23
-# worker1=192.168.3.24
-# worker2=192.168.3.25
+# Detect system architecture
+ARCH=$(uname -m)
+if [[ "$ARCH" == "x86_64" ]]; then
+    ARCH="amd64"
+elif [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+    ARCH="arm64"
+else
+    echo -e " \033[31;5mUnsupported architecture: $ARCH\033[0m"
+    exit 1
+fi
+
+# Set the IP address of the single node
 master1=$(hostname -I | awk '{print $1}')  # Automatically detected IP
 
-# User of remote machines
-# user=ubuntu
+# User of the local machine
 user=$(whoami)  # Automatically detected user
 
-# Interface used on remotes
-# interface=eth0
+# Interface used on the local machine
 interface=$(ip route | grep default | awk '{print $5}')  # Automatically detected interface
-
 
 # Set the virtual IP address (VIP)
 vip=192.168.3.50
 
 # Array of master nodes
-# masters=($master2 $master3)
 masters=()  # No additional master nodes
 
 # Array of worker nodes
-# workers=($worker1 $worker2)
 workers=()  # No worker nodes
 
-# Array of all
-# all=($master1 $master2 $master3 $worker1 $worker2)
+# Array of all nodes
 all=($master1)
 
-# Array of all minus master
-# allnomaster1=($master2 $master3 $worker1 $worker2)
+# Array of all nodes minus master1
 allnomaster1=()
 
-#Loadbalancer IP range
+# Loadbalancer IP range
 lbrange=192.168.3.60-192.168.3.80
 
-#ssh certificate name variable
+# SSH certificate name variable
 certName=id_rsa
 
-#ssh config file
+# SSH config file
 config_file=~/.ssh/config
 
 #############################################
@@ -96,27 +102,50 @@ else
 fi
 
 # Install k3sup to local machine if not already present
-if ! command -v k3sup version &> /dev/null
+if ! command -v k3sup &> /dev/null
 then
     echo -e " \033[31;5mk3sup not found, installing\033[0m"
     curl -sLS https://get.k3sup.dev | sh
-    sudo install k3sup /usr/local/bin/
+    # Rename and install k3sup based on architecture
+    if [ "$ARCH" == "arm64" ]; then
+        if [ -f "k3sup-arm64" ]; then
+            sudo install k3sup-arm64 /usr/local/bin/k3sup
+            rm k3sup-arm64
+            echo -e " \033[32;5mk3sup installed successfully!\033[0m"
+        else
+            echo -e " \033[31;5mError: k3sup-arm64 was not downloaded correctly.\033[0m"
+            exit 1
+        fi
+    else
+        if [ -f "k3sup" ]; then
+            sudo install k3sup /usr/local/bin/k3sup
+            rm k3sup
+            echo -e " \033[32;5mk3sup installed successfully!\033[0m"
+        else
+            echo -e " \033[31;5mError: k3sup was not downloaded correctly.\033[0m"
+            exit 1
+        fi
+    fi
 else
     echo -e " \033[32;5mk3sup already installed\033[0m"
 fi
 
 # Install Kubectl if not already present
-if ! command -v kubectl version &> /dev/null
+if ! command -v kubectl &> /dev/null
 then
     echo -e " \033[31;5mKubectl not found, installing\033[0m"
-    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-    sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+    # Download kubectl based on architecture
+    kubectl_url="https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl"
+    curl -LO "$kubectl_url"
+    chmod +x kubectl
+    sudo install kubectl /usr/local/bin/
+    rm kubectl
+    echo -e " \033[32;5mKubectl installed successfully!\033[0m"
 else
     echo -e " \033[32;5mKubectl already installed\033[0m"
 fi
 
 # Check for SSH config file, create if needed, add/change Strict Host Key Checking (don't use in production!)
-
 if [ ${#all[@]} -gt 1 ]; then
     if [ ! -f "$config_file" ]; then
         # Create the file and add the line
@@ -125,20 +154,20 @@ if [ ${#all[@]} -gt 1 ]; then
         chmod 600 "$config_file"
         echo "File created and line added."
     else
-    # Check if the line exists
-    if grep -q "^StrictHostKeyChecking" "$config_file"; then
-        # Check if the value is not "no"
-        if ! grep -q "^StrictHostKeyChecking no" "$config_file"; then
-            # Replace the existing line
-            sed -i 's/^StrictHostKeyChecking.*/StrictHostKeyChecking no/' "$config_file"
-            echo "Line updated."
+        # Check if the line exists
+        if grep -q "^StrictHostKeyChecking" "$config_file"; then
+            # Check if the value is not "no"
+            if ! grep -q "^StrictHostKeyChecking no" "$config_file"; then
+                # Replace the existing line
+                sed -i 's/^StrictHostKeyChecking.*/StrictHostKeyChecking no/' "$config_file"
+                echo "Line updated."
+            else
+                echo "Line already set to 'no'."
+            fi
         else
-            echo "Line already set to 'no'."
-        fi
-    else
-            # Add the line to the end of the file
-            echo "StrictHostKeyChecking no" >> "$config_file"
-            echo "Line added."
+                # Add the line to the end of the file
+                echo "StrictHostKeyChecking no" >> "$config_file"
+                echo "Line added."
         fi
     fi
 fi
@@ -146,23 +175,17 @@ fi
 # Install policycoreutils for each node
 if [ ${#all[@]} -gt 1 ]; then
     for newnode in "${all[@]}"; do
-      ssh $user@$newnode -i ~/.ssh/$certName sudo su <<EOF
-      NEEDRESTART_MODE=a apt-get install policycoreutils -y
-      exit
-EOF
+      ssh $user@$newnode -i ~/.ssh/$certName sudo yum install policycoreutils -y
       echo -e " \033[32;5mPolicyCoreUtils installed on $newnode!\033[0m"
     done
 else
     echo -e " \033[32;5mInstalling PolicyCoreUtils locally...\033[0m"
-    sudo su <<EOF
-    NEEDRESTART_MODE=a apt-get install policycoreutils -y
-    exit
-EOF
+    sudo yum install policycoreutils -y
     echo -e " \033[32;5mPolicyCoreUtils installed locally!\033[0m"
 fi
 
 # Step 1: Bootstrap First k3s Node
-mkdir ~/.kube
+mkdir -p ~/.kube
 if [ ${#all[@]} -eq 1 ]; then
     echo -e " \033[34;5mInstalling K3s on the single node...\033[0m"
     k3sup install \
@@ -205,16 +228,16 @@ kubectl apply -f https://kube-vip.io/manifests/rbac.yaml
 
 # Step 3: Download kube-vip
 curl -sO https://raw.githubusercontent.com/JamesTurland/JimsGarage/main/Kubernetes/K3S-Deploy/kube-vip
-cat kube-vip | sed 's/$interface/'$interface'/g; s/$vip/'$vip'/g' > $HOME/kube-vip.yaml
+sed "s/\$interface/$interface/g; s/\$vip/$vip/g" kube-vip > $HOME/kube-vip.yaml
+rm kube-vip
 
-# Step 4: Copy kube-vip.yaml to master1
+# Step 4: Apply kube-vip.yaml
 if [ ${#all[@]} -eq 1 ]; then
     echo -e " \033[34;5mApplying kube-vip.yaml locally...\033[0m"
     kubectl apply -f $HOME/kube-vip.yaml
 else
     scp -i ~/.ssh/$certName $HOME/kube-vip.yaml $user@$master1:~/kube-vip.yaml
 fi
-
 
 # Step 5: Connect to Master1 and move kube-vip.yaml
 if [ ${#all[@]} -gt 1 ]; then
@@ -242,7 +265,7 @@ if [ ${#masters[@]} -gt 0 ]; then
     done
 fi
 
-# add workers
+# Add workers
 if [ ${#workers[@]} -gt 0 ]; then
     for newagent in "${workers[@]}"; do
       k3sup join \
@@ -266,8 +289,9 @@ kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.12/conf
 
 # Download ipAddressPool and configure using lbrange above
 curl -sO https://raw.githubusercontent.com/JamesTurland/JimsGarage/main/Kubernetes/K3S-Deploy/ipAddressPool
-cat ipAddressPool | sed 's/$lbrange/'$lbrange'/g' > $HOME/ipAddressPool.yaml
+sed "s/\$lbrange/$lbrange/g" ipAddressPool > $HOME/ipAddressPool.yaml
 kubectl apply -f $HOME/ipAddressPool.yaml
+rm ipAddressPool
 
 # Step 9: Test with Nginx
 kubectl apply -f https://raw.githubusercontent.com/inlets/inlets-operator/master/contrib/nginx-sample-deployment.yaml -n default
@@ -275,6 +299,7 @@ kubectl expose deployment nginx-1 --port=80 --type=LoadBalancer -n default
 
 echo -e " \033[32;5mWaiting for K3S to sync and LoadBalancer to come online\033[0m"
 
+# Wait until the Nginx pod is Ready
 while [[ $(kubectl get pods -l app=nginx -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') != "True" ]]; do
    sleep 1
 done
@@ -284,9 +309,13 @@ kubectl wait --namespace metallb-system \
                 --for=condition=ready pod \
                 --selector=component=controller \
                 --timeout=120s
-kubectl apply -f ipAddressPool.yaml
+kubectl apply -f $HOME/ipAddressPool.yaml
 kubectl apply -f https://raw.githubusercontent.com/JamesTurland/JimsGarage/main/Kubernetes/K3S-Deploy/l2Advertisement.yaml
 
+# Clean up temporary files
+rm $HOME/ipAddressPool.yaml
+
+# Display Cluster Information
 kubectl get nodes
 kubectl get svc
 kubectl get pods --all-namespaces -o wide
