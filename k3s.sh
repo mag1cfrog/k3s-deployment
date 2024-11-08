@@ -51,7 +51,8 @@ master1=$(hostname -I | awk '{print $1}')  # Automatically detected IP
 user=$(whoami)  # Automatically detected user
 
 # Interface used on the local machine
-interface=$(ip route | grep default | awk '{print $5}')  # Automatically detected interface
+interface=$(ip route | grep default | awk '{print $5}' | head -n1)  # Select only the first default interface
+
 
 # Set the virtual IP address (VIP)
 vip=192.168.3.50
@@ -175,12 +176,12 @@ fi
 # Install policycoreutils for each node
 if [ ${#all[@]} -gt 1 ]; then
     for newnode in "${all[@]}"; do
-      ssh $user@$newnode -i ~/.ssh/$certName sudo yum install policycoreutils -y
+      ssh $user@$newnode -i ~/.ssh/$certName sudo apt install policycoreutils -y
       echo -e " \033[32;5mPolicyCoreUtils installed on $newnode!\033[0m"
     done
 else
     echo -e " \033[32;5mInstalling PolicyCoreUtils locally...\033[0m"
-    sudo yum install policycoreutils -y
+    sudo apt install policycoreutils -y
     echo -e " \033[32;5mPolicyCoreUtils installed locally!\033[0m"
 fi
 
@@ -228,7 +229,12 @@ kubectl apply -f https://kube-vip.io/manifests/rbac.yaml
 
 # Step 3: Download kube-vip
 curl -sO https://raw.githubusercontent.com/JamesTurland/JimsGarage/main/Kubernetes/K3S-Deploy/kube-vip
-sed "s/\$interface/$interface/g; s/\$vip/$vip/g" kube-vip > $HOME/kube-vip.yaml
+
+echo "Interface: $interface"
+echo "VIP: $vip"
+
+sed "s|\$interface|$interface|g; s|\$vip|$vip|g" kube-vip > $HOME/kube-vip.yaml
+
 rm kube-vip
 
 # Step 4: Apply kube-vip.yaml
@@ -289,7 +295,9 @@ kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.12/conf
 
 # Download ipAddressPool and configure using lbrange above
 curl -sO https://raw.githubusercontent.com/JamesTurland/JimsGarage/main/Kubernetes/K3S-Deploy/ipAddressPool
-sed "s/\$lbrange/$lbrange/g" ipAddressPool > $HOME/ipAddressPool.yaml
+
+sed "s|\$lbrange|$lbrange|g" ipAddressPool > $HOME/ipAddressPool.yaml
+
 kubectl apply -f $HOME/ipAddressPool.yaml
 rm ipAddressPool
 
