@@ -1,5 +1,3 @@
-kube-vip.yaml
-ipAddressPool.yaml
 *.log
 *.tmp
 kubeconfig
