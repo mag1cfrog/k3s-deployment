@@ -321,7 +321,8 @@ kubectl rollout status deployment/controller -n metallb-system --timeout=180s
 
 # Step 8.4: Wait for MetalLB's webhook-service to have endpoints with a timeout
 echo -e " \033[34;5mWaiting for MetalLB's webhook-service to have endpoints...\033[0m"
-kubectl wait --for=condition=ready endpoints/webhook-service -n metallb-system --timeout=300s
+kubectl wait --for=condition=ready endpoints/metallb-webhook-service -n metallb-system --timeout=300s
+
 
 echo "MetalLB's webhook-service is now available and has endpoints."
 
