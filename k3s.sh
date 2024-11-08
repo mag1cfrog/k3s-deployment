@@ -290,15 +290,62 @@ fi
 kubectl apply -f https://raw.githubusercontent.com/kube-vip/kube-vip-cloud-provider/main/manifest/kube-vip-cloud-controller.yaml
 
 # Step 8: Install Metallb
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.12.1/manifests/namespace.yaml
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.12/config/manifests/metallb-native.yaml
+# kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.12/manifests/namespace.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.8/config/manifests/metallb-native.yaml
 
-# Download ipAddressPool and configure using lbrange above
+
+
+# Step 8.1: Patch MetalLB controller to tolerate master node taint
+echo -e " \033[34;5mPatching MetalLB controller deployment with tolerations...\033[0m"
+kubectl patch deployment controller -n metallb-system --patch 'spec:
+  template:
+    spec:
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"'
+
+# Step 8.2: Patch MetalLB speaker daemonset to tolerate master node taint
+echo -e " \033[34;5mPatching MetalLB speaker daemonset with tolerations...\033[0m"
+kubectl patch daemonset speaker -n metallb-system --patch 'spec:
+  template:
+    spec:
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"'
+
+# Step 8.3: Wait for MetalLB's controller deployment to be ready
+echo -e " \033[34;5mWaiting for MetalLB's controller deployment to be ready...\033[0m"
+kubectl rollout status deployment/controller -n metallb-system --timeout=180s
+
+# Step 8.4: Wait for MetalLB's webhook-service to have endpoints with a timeout
+echo -e " \033[34;5mWaiting for MetalLB's webhook-service to have endpoints...\033[0m"
+kubectl wait --for=condition=ready endpoints/webhook-service -n metallb-system --timeout=300s
+
+echo "MetalLB's webhook-service is now available and has endpoints."
+
+# Step 8.5: Download ipAddressPool and configure using lbrange
 curl -sO https://raw.githubusercontent.com/JamesTurland/JimsGarage/main/Kubernetes/K3S-Deploy/ipAddressPool
 
-sed "s|\$lbrange|$lbrange|g" ipAddressPool > $HOME/ipAddressPool.yaml
+# Export lbrange for envsubst
+export lbrange
 
-kubectl apply -f $HOME/ipAddressPool.yaml
+# Use envsubst to replace placeholders
+envsubst < ipAddressPool > "$HOME/ipAddressPool.yaml"
+
+# Verify if envsubst succeeded
+if [ $? -ne 0 ]; then
+    echo -e " \033[31;5mError: envsubst command failed for ipAddressPool.\033[0m"
+    exit 1
+fi
+
+# Apply ipAddressPool.yaml and l2Advertisement.yaml
+kubectl apply -f "$HOME/ipAddressPool.yaml"
+kubectl apply -f https://raw.githubusercontent.com/JamesTurland/JimsGarage/main/Kubernetes/K3S-Deploy/l2Advertisement.yaml
+
+# Clean up temporary files
+rm "$HOME/ipAddressPool.yaml"
 rm ipAddressPool
 
 # Step 9: Test with Nginx
