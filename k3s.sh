@@ -193,7 +193,7 @@ if [ ${#all[@]} -eq 1 ]; then
       --local \
       --tls-san $vip \
       --k3s-version $k3sVersion \
-      --k3s-extra-args "--disable traefik --disable servicelb --flannel-iface=$interface --node-ip=$master1 --node-taint node-role.kubernetes.io/master=true:NoSchedule" \
+      --k3s-extra-args "--disable traefik --disable servicelb --flannel-iface=$interface --node-ip=$master1 " \
       --sudo \
       --context k3s-single-node
     echo -e " \033[32;5mSingle Node K3s bootstrapped successfully!\033[0m"
@@ -361,8 +361,17 @@ rm "$HOME/ipAddressPool.yaml"
 rm ipAddressPool
 
 # Step 9: Test with Nginx
+echo -e " \033[34;5mDeploying Nginx for LoadBalancer Testing...\033[0m"
 kubectl apply -f https://raw.githubusercontent.com/inlets/inlets-operator/master/contrib/nginx-sample-deployment.yaml -n default
-kubectl expose deployment nginx-1 --port=80 --type=LoadBalancer -n default
+
+# Check if the service already exists
+if kubectl get svc nginx-1 -n default > /dev/null 2>&1; then
+    echo -e " \033[33;5mService 'nginx-1' already exists. Skipping creation.\033[0m"
+else
+    kubectl expose deployment nginx-1 --port=80 --type=LoadBalancer -n default
+    echo -e " \033[32;5mNginx service exposed successfully!\033[0m"
+fi
+
 
 echo -e " \033[32;5mWaiting for K3S to sync and LoadBalancer to come online\033[0m"
 
