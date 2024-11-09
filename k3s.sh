@@ -319,12 +319,23 @@ kubectl patch daemonset speaker -n metallb-system --patch 'spec:
 echo -e " \033[34;5mWaiting for MetalLB's controller deployment to be ready...\033[0m"
 kubectl rollout status deployment/controller -n metallb-system --timeout=180s
 
-# Step 8.4: Wait for MetalLB's webhook-service to have endpoints with a timeout
-echo -e " \033[34;5mWaiting for MetalLB's webhook-service to have endpoints...\033[0m"
-kubectl wait --for=condition=ready endpoints/metallb-webhook-service -n metallb-system --timeout=300s
+# Step 8.4: Wait for MetalLB's metallb-webhook-service to have endpoints with retries
+echo -e " \033[34;5mWaiting for MetalLB's metallb-webhook-service to have endpoints...\033[0m"
 
+max_retries=30
+count=0
+until kubectl get endpoints metallb-webhook-service -n metallb-system -o jsonpath='{.subsets[*].addresses[*].ip}' | grep -q '.'; do
+    if [ $count -ge $max_retries ]; then
+        echo -e " \033[31;5mError: metallb-webhook-service endpoints not found after $max_retries attempts.\033[0m"
+        exit 1
+    fi
+    echo "Waiting for metallb-webhook-service to have endpoints... ($((count+1))/$max_retries)"
+    sleep 5
+    count=$((count+1))
+done
 
-echo "MetalLB's webhook-service is now available and has endpoints."
+echo "MetalLB's metallb-webhook-service is now available and has endpoints."
+
 
 # Step 8.5: Download ipAddressPool and configure using lbrange
 curl -sO https://raw.githubusercontent.com/JamesTurland/JimsGarage/main/Kubernetes/K3S-Deploy/ipAddressPool
