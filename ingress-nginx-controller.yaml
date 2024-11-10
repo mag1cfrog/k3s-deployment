@@ -16,13 +16,6 @@ metadata:
   resourceVersion: "13189"
   uid: 8cef1ac2-1a46-40d1-9af9-e9b9ff9a0e2c
 spec:
-  type: NodePort
-  ports:
-    - name: http
-      port: 80
-      targetPort: 80
-      nodePort: 30080
-    - name: https
-      port: 443
-      targetPort: 443
-      nodePort: 30443
+  type: ClusterIP
+
+
